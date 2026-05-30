@@ -1,20 +1,21 @@
-%% ApplicationGraphToUniGraph.m
+%% ApplicationToMegaGraph.m
 % Dört uygulamanın görev grafiklerini tanımlamak ve birleştirmek için kullanılır.
 
 % VOPD (16)        MPEG4 (12)       VCE (25)         WIFIRX (20)
 % ├─ Görev 1-16    ├─ Görev 17-28   ├─ Görev 29-53   ├─ Görev 54-73
 % └─ Kenarları     └─ Kenarları     └─ Kenarları     └─ Kenarları
-%                                           ↓
-%                             ┌────────────────────────┐
-%                             │  MEGAGraf (73 görev)   │
-%                             │  ─ Tüm kenarlar birden │
-%                             │  ─ Tüm ağırlıklar      │
-%                             └────────────────────────┘
+%                                 ↓
+%                      ┌────────────────────────┐
+%                      │  MEGAGraf (73 görev)   │
+%                      │  ─ Tüm kenarlar birden │
+%                      │  ─ Tüm ağırlıklar      │
+%                      └────────────────────────┘
 
-function [MegaGraph] = ApplicationGraphToMegaGraph()
-    % Output: [ TasskNumber, SourceTask, TargetTask, EdgeWeight ]
+function [MegaGraph] = ApplicationToMegaGraph()
+    % Output: [ TaskNumber, SourceTask, TargetTask, EdgeWeight ]
 
-    %% ADIM 1: Uygulama Grafikleri Tanımla
+    %% STEP 1: Uygulama Grafikleri Tanımla
+        
     % APP 1: Video Object Plane Decoder (VOPD)
     apps(1).name = 'VOPD';
     apps(1).nTasks = 16;
@@ -44,7 +45,8 @@ function [MegaGraph] = ApplicationGraphToMegaGraph()
     apps(4).weight = [640 640 640 640 640 1 640 640 512 512 384 384 384 384 72 72 72 108 54 6 54 1 1 1 1 1 4 1 1 1 1 1 54];
     
 
-    %% ADIM 2: Grafları Birleştir
+    %% STEP 2: Grafları Birleştir
+    % ======================================================
     n = length(apps);
     GraphLengths = zeros(1, n);
     
@@ -52,32 +54,41 @@ function [MegaGraph] = ApplicationGraphToMegaGraph()
     Task = apps(1).nTasks;
     S = apps(1).source;
     T = apps(1).target;
-    P = apps(1).weight;
+    W = apps(1).weight;
     GraphLengths(1) = Task; 
     
     % i > 1 durumu: Diğer grafları kaydırma (offset) ile ekle
     for i = 2:n
         S1 = apps(i).source;
         T1 = apps(i).target;
-        P1 = apps(i).weight;
-        GraphLengths(i) = Task; 
+        W1 = apps(i).weight;
         
         % Düğüm numaralarına o ana kadarki toplam görev sayısını (Task) ekle
         S = cat(2, S, S1 + Task);
         T = cat(2, T, T1 + Task);
-        P = cat(2, P, P1);
+        W = cat(2, W, W1);
         
-        % Toplam MegaGraf görev sayısını güncelle
+        % Toplam MegaGraf görev sayısını güncelle ve kümülatif sayacı kaydet
         Task = Task + apps(i).nTasks;
+        GraphLengths(i) = Task;        % Kümülatif: apps(i) dahil toplam görev sayısı
     end
 
-    %% ADIM 3: PlatEMO Formatında Final Çıktısı (Cell Array)
+    %% STEP 3: PlatEMO Formatında Final Çıktısı (Cell Array)
+    % ======================================================
     Line = 9;       % NoC ağı 9x9 olacak
     Column = 9;     % NoC ağı 9x9 olacak
     Type = 9;       
 
-    CompositeGraph = {Task, Line, Column, S, T, P, Type};
-    MegaGraph = [CompositeGraph GraphLengths];
+    CompositeGraph = {Task, Line, Column, S, T, W, Type};
+    MegaGraph = [CompositeGraph, {GraphLengths}];   % {GraphLengths} → MegaGraph{8} = [16 28 53 73]
+
+    %% STEP 4: Log
+    % ======================================================
+    disp('MegaGraf Olusturma Tamamlandi');
+    fprintf('NoC Size          : %d x %d\n', Line, Column);
+    fprintf('Total Tasks         : %d\n', Task);
+    fprintf('Number of Applications: %d\n', n);
+    fprintf('GraphLengths        : [%s]\n', num2str(GraphLengths));
 
 end
     
